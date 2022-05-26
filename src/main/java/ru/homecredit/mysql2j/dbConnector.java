@@ -1,13 +1,14 @@
 package ru.homecredit.mysql2j;
 
 import java.sql.*;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 
 /******************************************************************************
- * Classname - MySQLConnector
+ * Classname - dbConnector
  * Version - 1.0.0
  *
  * DESCRIPTION
@@ -22,48 +23,17 @@ import java.util.logging.Logger;
  * inushtaev    05/24/22 - Creation
  *****************************************************************************/
 
-public class MySQLConnector {
+public class dbConnector {
     private Connection conn = null;
-    private Logger logger;
+    private final Logger logger;
     private Statement stmt;
-    private String[] optionsFromDB;
-/*
-    public static class JiraResponse {
-        public final String fieldKey;
-        public final String newOption;
-        public final String projectKey;
-        public final String fieldName;
-        public final String projectName;
-        public final String fieldConfigName;
-        public final String[] fieldOptions;
-        public final String result;
 
-        public JiraResponse(
-                @JsonProperty("fieldKey") String fieldKey,
-                @JsonProperty("newOption") String newOption,
-                @JsonProperty("projectKey") String projectKey,
-                @JsonProperty("fieldName") String fieldName,
-                @JsonProperty("projectName") String projectName,
-                @JsonProperty("fieldConfigName") String fieldConfigName,
-                @JsonProperty("fieldOptions") String[] fieldOptions,
-                @JsonProperty("result") String result)
-        {
-            this.fieldKey = fieldKey;
-            this.newOption = newOption;
-            this.projectKey = projectKey;
-            this.fieldName = fieldName;
-            this.projectName = projectName;
-            this.fieldConfigName = fieldConfigName;
-            this.fieldOptions = fieldOptions;
-            this.result = result;
-        }
-    }
-*/
-    MySQLConnector(String uri, String user, String password) {
+    dbConnector(String dbUri, String dbUser, String dbPassword) {
         logger = LoggerUtils.getLogger();
+        logger.log(Level.INFO, "dbConnector constructor started");
         try {
-            logger.log(Level.INFO, "Establishing connect to DB with URI " + uri);
-            conn = DriverManager.getConnection(uri, user, password);
+            logger.log(Level.INFO, "Establishing connect to DB with URI " + dbUri);
+            conn = DriverManager.getConnection(dbUri, dbUser, dbPassword);
             stmt = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,
                     ResultSet.CONCUR_READ_ONLY);
         } catch (SQLException sqlEx) {
@@ -74,9 +44,10 @@ public class MySQLConnector {
         }
     }
 
-    public void receiveOptionsFromDB(String table, String column) {
+    public String[] receiveOptionsFromDB(String table, String column) {
         LinkedList<String> optionsQueue = new LinkedList<>();
         ResultSet rs = null;
+        String[] optionsFromDB;
 
         String query = "SELECT * FROM " + table;
         try {
@@ -101,10 +72,14 @@ public class MySQLConnector {
         }
         optionsFromDB = new String[optionsQueue.size()];
         int i = 0;
+        StringBuilder receivedOptions = new StringBuilder("Received options are: ");
         while (!optionsQueue.isEmpty()) {
             optionsFromDB[i] = optionsQueue.pop();
-            System.out.println(optionsFromDB[i++]);
+            receivedOptions.append(optionsFromDB[i++]).append(", ");
         }
+        receivedOptions.setLength(receivedOptions.length() - 2);
+        logger.log(Level.INFO, receivedOptions.toString());
+        return Arrays.copyOf(optionsFromDB, optionsFromDB.length);
     }
 
     public void close() {
@@ -121,6 +96,21 @@ public class MySQLConnector {
     }
 
     public static void main(String[] args) {
+        String dbUri = "jdbc:mysql://localhost:3306/autos";
+        String dbUser = "ignat";
+        String dbPassword = "pass";
+        String optionsTable = "options_table";
+        String optionsColumn = "options";
 
+        new LoggerUtils();
+        dbConnector dbConnector = new dbConnector(dbUri, dbUser, dbPassword);
+        String[] mySqlOptions = dbConnector
+                .receiveOptionsFromDB(optionsTable, optionsColumn);
+        for (String mySqlOption : mySqlOptions) {
+            System.out.println(mySqlOption);
+        }
+        dbConnector.close();
+
+        LoggerUtils.closeLogFiles();
     }
 }
