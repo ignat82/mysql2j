@@ -1,11 +1,10 @@
 package ru.homecredit.mysql2j;
 
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Connection;
-import java.sql.Statement;
-import java.sql.ResultSet;
-import java.util.logging.*;
+import java.sql.*;
+import java.util.LinkedList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 
 /******************************************************************************
  * Classname - MySQLConnector
@@ -24,67 +23,104 @@ import java.util.logging.*;
  *****************************************************************************/
 
 public class MySQLConnector {
+    private Connection conn = null;
+    private Logger logger;
+    private Statement stmt;
+    private String[] optionsFromDB;
+/*
+    public static class JiraResponse {
+        public final String fieldKey;
+        public final String newOption;
+        public final String projectKey;
+        public final String fieldName;
+        public final String projectName;
+        public final String fieldConfigName;
+        public final String[] fieldOptions;
+        public final String result;
 
-    public static void main(String[] args) {
-        String URI = "jdbc:mysql://localhost:3306/autos";
-        String USER = "ignat";
-        String PASSWORD = "pass";
-        Connection conn = null;
-        Statement stmt = null;
-        String query;
-        ResultSet rs = null;
-        Logger logger;
-
-        new LoggerUtils();
+        public JiraResponse(
+                @JsonProperty("fieldKey") String fieldKey,
+                @JsonProperty("newOption") String newOption,
+                @JsonProperty("projectKey") String projectKey,
+                @JsonProperty("fieldName") String fieldName,
+                @JsonProperty("projectName") String projectName,
+                @JsonProperty("fieldConfigName") String fieldConfigName,
+                @JsonProperty("fieldOptions") String[] fieldOptions,
+                @JsonProperty("result") String result)
+        {
+            this.fieldKey = fieldKey;
+            this.newOption = newOption;
+            this.projectKey = projectKey;
+            this.fieldName = fieldName;
+            this.projectName = projectName;
+            this.fieldConfigName = fieldConfigName;
+            this.fieldOptions = fieldOptions;
+            this.result = result;
+        }
+    }
+*/
+    MySQLConnector(String uri, String user, String password) {
         logger = LoggerUtils.getLogger();
-        logger.log(Level.INFO, logger.getName() + " started log");
-        // initialize connection
         try {
-            logger.log(Level.INFO, "Establishing connect to DB with URI " + URI);
-            conn = DriverManager.getConnection(URI, USER, PASSWORD);
-            // Do something with the Connection
-            stmt = conn.createStatement();
-            query = "SELECT * FROM profile";
-            logger.log(Level.INFO, "Executing query \"" + query + "\"");
-            rs = stmt.executeQuery(query);
-            // Now do something with the ResultSet ....
-            while (rs.next()) {
-                logger.log(Level.INFO, "Got response");
-                System.out.println(rs.getString("first_name"));
-            }
-
+            logger.log(Level.INFO, "Establishing connect to DB with URI " + uri);
+            conn = DriverManager.getConnection(uri, user, password);
+            stmt = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,
+                    ResultSet.CONCUR_READ_ONLY);
         } catch (SQLException sqlEx) {
             // handle any errors
-            logger.log(Level.WARNING, "Something goes wrong");
             logger.log(Level.WARNING, "SQLException: " + sqlEx.getMessage());
-            System.out.println("SQLException: " + sqlEx.getMessage());
-            logger.log(Level.WARNING, "SQLException: " + sqlEx.getMessage());
-            System.out.println("SQLState: " + sqlEx.getSQLState());
-            logger.log(Level.WARNING, "SQLException: " + sqlEx.getMessage());
-            System.out.println("VendorError: " + sqlEx.getErrorCode());
+            logger.log(Level.WARNING, "SQLState: " + sqlEx.getSQLState());
+            logger.log(Level.WARNING, "VendorError: " + sqlEx.getErrorCode());
         }
+    }
 
-        finally {
-            // it is a good idea to release
-            // resources in a finally{} block
-            // in reverse-order of their creation
-            // if they are no-longer needed
+    public void receiveOptionsFromDB(String table, String column) {
+        LinkedList<String> optionsQueue = new LinkedList<>();
+        ResultSet rs = null;
+
+        String query = "SELECT * FROM " + table;
+        try {
+            logger.log(Level.INFO, "Executing query \"" + query + "\"");
+            rs = stmt.executeQuery(query);
+            logger.log(Level.INFO, "Got response");
+            while (rs.next()) {
+                optionsQueue.add(rs.getString(column));
+            }
+            } catch (SQLException sqlEx) {
+            logger.log(Level.WARNING, "SQLException: " + sqlEx.getMessage());
+            logger.log(Level.WARNING, "SQLState: " + sqlEx.getSQLState());
+            logger.log(Level.WARNING, "VendorError: " + sqlEx.getErrorCode());
+        } finally {
             logger.log(Level.INFO, "Releasing resources");
             if (rs != null) {
                 try {
-                    logger.log(Level.INFO, "Closing response");
+                    logger.log(Level.INFO, "Closing Response");
                     rs.close();
                 } catch (SQLException sqlEx) { } // ignore
-                rs = null;
-            }
-
-            if (stmt != null) {
-                try {
-                    logger.log(Level.INFO, "Closing Statement");
-                    stmt.close();
-                } catch (SQLException sqlEx) { } // ignore
-                stmt = null;
             }
         }
+        optionsFromDB = new String[optionsQueue.size()];
+        int i = 0;
+        while (!optionsQueue.isEmpty()) {
+            optionsFromDB[i] = optionsQueue.pop();
+            System.out.println(optionsFromDB[i++]);
+        }
+    }
+
+    public void close() {
+        if (stmt != null) {
+            try {
+                logger.log(Level.INFO, "Closing Statement");
+                stmt.close();
+                logger.log(Level.INFO, "Closing Connection");
+                conn.close();
+            } catch (SQLException sqlEx) { } // ignore
+            stmt = null;
+            conn = null;
+        }
+    }
+
+    public static void main(String[] args) {
+
     }
 }
