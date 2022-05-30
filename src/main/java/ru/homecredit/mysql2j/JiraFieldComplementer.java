@@ -18,6 +18,7 @@ public class JiraFieldComplementer {
         logger.log(Level.INFO, "constructed JiraFieldComplementer");
     }
 
+
     public void complementField(String optionsTable,
                                 String optionsColumn,
                                 String field_key,
